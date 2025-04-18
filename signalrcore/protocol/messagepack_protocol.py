@@ -38,9 +38,9 @@ class MessagePackHubProtocol(BaseHubProtocol):
             messages = []
             offset = 0
             while offset < len(raw):
-                length = msgpack.unpackb(raw[offset: offset + 1])
-                values = msgpack.unpackb(raw[offset + 1: offset + length + 1])
-                offset = offset + length + 1
+                length, len_bytes = self._from_varint(raw[offset:])
+                values = msgpack.unpackb(raw[offset + len_bytes: offset + length + len_bytes])
+                offset = offset + length + len_bytes
                 message = self._decode_message(values)
                 messages.append(message)
         except Exception as ex:
@@ -170,3 +170,14 @@ class MessagePackHubProtocol(BaseHubProtocol):
                 break
 
         return buffer
+
+    def _from_varint(self, data: bytes) -> tuple[int, int]:
+            """Parse a variable-length integer from the given byte array. Returns the integer and the number of bytes read."""
+            result = 0
+            shift = 0
+            for byte in data:
+                result |= (byte & 0x7F) << shift
+                if not (byte & 0x80):
+                    break
+                shift += 7
+            return result, shift // 7 + 1
